@@ -1,0 +1,9 @@
+{
+  "name": "Remix: Kreeda-Prerana Scout",
+  "description": "A grassroots sports talent tracker for physical education teachers to record students\u0027 physical milestones and identify high-potential athletes.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": []
+}

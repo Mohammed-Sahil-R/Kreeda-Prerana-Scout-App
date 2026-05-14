@@ -1,0 +1,56 @@
+{
+  "entities": {
+    "student": {
+      "title": "Student athlete",
+      "description": "Profile of a student athlete being tracked.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name of the student" },
+        "age": { "type": "number", "description": "Age of the student" },
+        "gender": { "type": "string", "enum": ["Male", "Female", "Other"], "description": "Gender of the student" },
+        "primarySport": { "type": "string", "description": "Main sport the student focuses on" },
+        "teacherId": { "type": "string", "description": "UID of the teacher who created this profile" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the profile was created" },
+        "photoUrl": { "type": "string", "description": "Base64 or URL of student photo" }
+      },
+      "required": ["name", "age", "gender", "primarySport", "teacherId", "createdAt"]
+    },
+    "performanceLog": {
+      "title": "Performance Log",
+      "description": "A record of an athletic test result.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string", "description": "ID of the student" },
+        "testType": { "type": "string", "enum": ["sprint_100m", "long_jump", "high_jump", "shot_put"], "description": "Type of athletic test" },
+        "value": { "type": "number", "description": "Numeric result of the test (seconds or meters)" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the test was performed" },
+        "teacherId": { "type": "string", "description": "UID of the teacher recording the test" }
+      },
+      "required": ["studentId", "testType", "value", "timestamp", "teacherId"]
+    },
+    "coachProfile": {
+      "title": "Coach Profile",
+      "description": "Additional information for a coach/teacher.",
+      "type": "object",
+      "properties": {
+        "schoolName": { "type": "string", "description": "Name of the school" },
+        "bio": { "type": "string", "description": "Short bio or professional goals" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": "student",
+      "description": "Collection of student athlete profiles."
+    },
+    "/performanceLogs/{logId}": {
+      "schema": "performanceLog",
+      "description": "Collection of athletic performance results."
+    },
+    "/coaches/{coachId}": {
+      "schema": "coachProfile",
+      "description": "Settings and profile info for coaches."
+    }
+  }
+}

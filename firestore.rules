@@ -1,0 +1,100 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(data) {
+      return isSignedIn() && data.teacherId == request.auth.uid;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // Student Validation (Pillar 2: Validation Blueprint)
+    function isValidStudent(data) {
+      return data.keys().hasAll(['name', 'age', 'gender', 'grade', 'primarySport', 'teacherId', 'createdAt'])
+        && data.keys().size() >= 7 && data.keys().size() <= 10
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
+        && data.age is number && data.age > 0 && data.age < 100
+        && data.gender in ['Male', 'Female', 'Other']
+        && data.grade is string && data.grade.size() <= 20
+        && data.primarySport is string && data.primarySport.size() <= 50
+        && data.teacherId == request.auth.uid
+        && (data.createdAt == request.time || data.createdAt is timestamp)
+        && (data.get('photoUrl', '') is string && data.get('photoUrl', '').size() <= 5000000); // 5MB limit for base64
+    }
+
+    // Performance Log Validation
+    function isValidPerformanceLog(data) {
+      return data.keys().hasAll(['studentId', 'testType', 'value', 'timestamp', 'teacherId'])
+        && data.keys().size() == 5
+        && isValidId(data.studentId)
+        && data.testType in ['sprint_100m', 'sprint_200m', 'sprint_400m', 'long_jump', 'high_jump', 'shot_put', 'vertical_jump', 'beep_test']
+        && data.value is number && data.value >= 0 && data.value <= 1000
+        && data.teacherId == request.auth.uid
+        && (data.timestamp == request.time || data.timestamp is timestamp)
+        // Pillar 1: Relational Sync
+        && exists(/databases/$(database)/documents/students/$(data.studentId))
+        && get(/databases/$(database)/documents/students/$(data.studentId)).data.teacherId == request.auth.uid;
+    }
+
+    // 1. Students Collection
+    match /students/{studentId} {
+      // Allow global read for scouting and leaderboard
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(studentId) && isValidStudent(incoming());
+      
+      allow update: if isSignedIn()
+        && isValidId(studentId)
+        && isOwner(existing())
+        && isValidStudent(incoming())
+        // Pillar 9: Immortal Fields
+        && incoming().teacherId == existing().teacherId
+        && incoming().createdAt == existing().createdAt
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'age', 'gender', 'grade', 'primarySport', 'photoUrl', 'updatedAt'])
+        );
+      
+      allow delete: if isSignedIn() && isValidId(studentId) && isOwner(existing());
+    }
+
+    // 2. Performance Logs Collection
+    match /performanceLogs/{logId} {
+      // Allow global read for leaderboard
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && isValidId(logId)
+        && isValidPerformanceLog(incoming());
+
+      allow delete: if isSignedIn() && isValidId(logId) && isOwner(existing());
+      
+      allow update: if false;
+    }
+
+    // 3. Coaches Collection
+    match /coaches/{coachId} {
+      allow get, list: if isSignedIn(); 
+      allow create: if isSignedIn() && coachId == request.auth.uid
+        && incoming().schoolName is string && incoming().schoolName.size() <= 200
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn() && coachId == request.auth.uid
+        && incoming().schoolName is string && incoming().schoolName.size() <= 200
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['schoolName', 'bio', 'updatedAt']);
+      allow delete: if isSignedIn() && coachId == request.auth.uid;
+    }
+  }
+}
